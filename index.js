@@ -5,7 +5,7 @@ require('dotenv').config();
 // Kafka config (HARDCODED)
 const kafka = new Kafka({
   clientId: 'car-consumer',
-  brokers: ['my-cluster-kafka-bootstrap.kafka.svc:9092'],
+  brokers: ['my-cluster-kafka-bootstrap.kafka.svc:9094'],
 });
 
 const consumer = kafka.consumer({
