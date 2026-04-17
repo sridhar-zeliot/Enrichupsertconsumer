@@ -31,52 +31,52 @@ async function initDB() {
 async function upsertCarData(data) {
   try {
     const query = `
-      MERGE car_data AS target
+      MERGE dbo.car_data AS target
       USING (SELECT 
-          @carId AS carId,
-          @carName AS carName,
-          @speed AS speed,
-          @fuelLevel AS fuelLevel,
-          @headlight AS headlight,
-          @engineTemp AS engineTemp,
-          @latitude AS latitude,
-          @longitude AS longitude
+        @car_id AS car_id,
+        @car_name AS car_name,
+        @speed AS speed,
+        @fuel_level AS fuel_level,
+        @headlight AS headlight,
+        @engine_temp AS engine_temp,
+        @latitude AS latitude,
+        @longitude AS longitude
       ) AS source
-      ON target.carId = source.carId
+      ON target.car_id = source.car_id
 
       WHEN MATCHED THEN
         UPDATE SET
-          carName = source.carName,
+          car_name = source.car_name,
           speed = source.speed,
-          fuelLevel = source.fuelLevel,
+          fuel_level = source.fuel_level,
           headlight = source.headlight,
-          engineTemp = source.engineTemp,
+          engine_temp = source.engine_temp,
           latitude = source.latitude,
           longitude = source.longitude
 
       WHEN NOT MATCHED THEN
         INSERT (
-          carId, carName, speed, fuelLevel, 
-          headlight, engineTemp, latitude, longitude
+          car_id, car_name, speed, fuel_level,
+          headlight, engine_temp, latitude, longitude, created_at
         )
         VALUES (
-          source.carId, source.carName, source.speed, source.fuelLevel, 
-          source.headlight, source.engineTemp, source.latitude, source.longitude
+          source.car_id, source.car_name, source.speed, source.fuel_level,
+          source.headlight, source.engine_temp, source.latitude, source.longitude, GETDATE()
         );
     `;
 
     await pool.request()
-      .input('carId', sql.Int, data.carId)
-      .input('carName', sql.VarChar, data.carName)
+      .input('car_id', sql.Int, Number(data.carId))
+      .input('car_name', sql.VarChar(50), data.carName)
       .input('speed', sql.Float, data.speed)
-      .input('fuelLevel', sql.Int, data.fuelLevel)
+      .input('fuel_level', sql.Int, data.fuelLevel)
       .input('headlight', sql.Bit, data.headlight ? 1 : 0)
-      .input('engineTemp', sql.Float, data.engineTemp)
-      .input('latitude', sql.Float, data.location?.latitude || null)
-      .input('longitude', sql.Float, data.location?.longitude || null)
+      .input('engine_temp', sql.Float, data.engineTemp)
+      .input('latitude', sql.Float, data.location?.latitude ?? null)
+      .input('longitude', sql.Float, data.location?.longitude ?? null)
       .query(query);
 
-    console.log(`🚀 UPSERT done for carId: ${data.carId}`);
+    console.log(`🚀 UPSERT SUCCESS → car_id: ${data.carId}`);
 
   } catch (err) {
     console.error('❌ UPSERT Error:', err.message);
@@ -96,13 +96,11 @@ async function run() {
 
   setInterval(async () => {
     try {
-      // 🔥 50% chance: same ID (update) or new ID (insert)
       const useSameId = Math.random() > 0.5;
 
       if (!useSameId) {
-        currentCarId = getRandomCarId(); // new → INSERT
+        currentCarId = getRandomCarId(); // INSERT
       }
-      // else same → UPDATE
 
       const data = {
         carId: currentCarId,
@@ -119,8 +117,8 @@ async function run() {
 
       console.log(
         useSameId
-          ? `♻️ Updating carId: ${currentCarId}`
-          : `🆕 Inserting carId: ${currentCarId}`
+          ? `♻️ UPDATE → carId: ${currentCarId}`
+          : `🆕 INSERT → carId: ${currentCarId}`
       );
 
       await upsertCarData(data);
