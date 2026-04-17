@@ -2,28 +2,43 @@ const { Kafka } = require('kafkajs');
 const sql = require('mssql');
 require('dotenv').config();
 
+// Kafka config (HARDCODED)
 const kafka = new Kafka({
   clientId: 'car-consumer',
   brokers: ['my-cluster-kafka-bootstrap.kafka.svc:9092'],
 });
 
-const consumer = kafka.consumer({ groupId: 'car-group' });
+const consumer = kafka.consumer({
+  groupId: 'car-group',
+});
 
+// MSSQL config
 const dbConfig = {
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   server: process.env.DB_SERVER,
   database: process.env.DB_NAME,
   port: parseInt(process.env.DB_PORT, 10),
+  options: {
+    encrypt: true,                // REQUIRED for your DB
+    trustServerCertificate: true // Fix self-signed cert error
+  },
 };
 
 let pool;
 
+// Initialize DB
 async function initDB() {
-  pool = await sql.connect(dbConfig);
-  console.log('Connected to MSSQL');
+  try {
+    pool = await sql.connect(dbConfig);
+    console.log('✅ Connected to MSSQL');
+  } catch (err) {
+    console.error('❌ DB Connection Failed:', err);
+    process.exit(1);
+  }
 }
 
+// UPSERT function
 async function upsertCarData(data) {
   const query = `
     MERGE car_data AS target
@@ -65,18 +80,22 @@ async function upsertCarData(data) {
     .input('longitude', sql.Float, data.location?.longitude || null)
     .query(query);
 
-  console.log(`UPSERT done for carId: ${data.carId}`);
+  console.log(`🚀 UPSERT done for carId: ${data.carId}`);
 }
 
+// Main function
 async function run() {
   await initDB();
 
   await consumer.connect();
+  console.log('✅ Kafka connected');
 
   await consumer.subscribe({
     topic: process.env.KAFKA_TOPIC,
-    fromBeginning: false
+    fromBeginning: false,
   });
+
+  console.log(`📡 Subscribed to topic: ${process.env.KAFKA_TOPIC}`);
 
   await consumer.run({
     eachMessage: async ({ message }) => {
@@ -84,10 +103,18 @@ async function run() {
         const value = JSON.parse(message.value.toString());
         await upsertCarData(value);
       } catch (err) {
-        console.error('Error processing message:', err);
+        console.error('❌ Error processing message:', err);
       }
     },
   });
 }
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('🔻 Shutting down...');
+  await consumer.disconnect();
+  await sql.close();
+  process.exit(0);
+});
 
 run();
