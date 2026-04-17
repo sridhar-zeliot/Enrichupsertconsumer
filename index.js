@@ -27,7 +27,7 @@ async function initDB() {
   }
 }
 
-// ✅ UPSERT Function
+// ✅ UPSERT Function 
 async function upsertCarData(data) {
   try {
     const query = `
@@ -62,10 +62,12 @@ async function upsertCarData(data) {
         VALUES (
           source.car_id, source.car_name, source.speed, source.fuel_level,
           source.headlight, source.engine_temp, source.latitude, source.longitude, GETDATE()
-        );
+        )
+
+      OUTPUT $action AS action, INSERTED.*;
     `;
 
-    await pool.request()
+    const result = await pool.request()
       .input('car_id', sql.Int, Number(data.carId))
       .input('car_name', sql.VarChar(50), data.carName)
       .input('speed', sql.Float, data.speed)
@@ -76,16 +78,32 @@ async function upsertCarData(data) {
       .input('longitude', sql.Float, data.location?.longitude ?? null)
       .query(query);
 
-    console.log(`🚀 UPSERT SUCCESS → car_id: ${data.carId}`);
+    const row = result.recordset[0];
+
+    if (row.action === 'INSERT') {
+      console.log(` INSERT → car_id: ${row.car_id}`);
+    } else {
+      console.log(` UPDATE → car_id: ${row.car_id}`);
+    }
 
   } catch (err) {
     console.error('❌ UPSERT Error:', err.message);
   }
 }
 
-// ✅ Random carId (1–15)
+// ✅ ENV CONFIG
+const CAR_ID_MIN = parseInt(process.env.CAR_ID_MIN, 10) || 1;
+const CAR_ID_MAX = parseInt(process.env.CAR_ID_MAX, 10) || 15;
+const INTERVAL_MS = parseInt(process.env.INTERVAL_MS, 10) || 5000;
+
+// ✅ Validation
+if (CAR_ID_MIN > CAR_ID_MAX) {
+  throw new Error('CAR_ID_MIN cannot be greater than CAR_ID_MAX');
+}
+
+// ✅ Random carId
 function getRandomCarId() {
-  return Math.floor(Math.random() * 15) + 1;
+  return Math.floor(Math.random() * (CAR_ID_MAX - CAR_ID_MIN + 1)) + CAR_ID_MIN;
 }
 
 // ✅ Main Logic
@@ -94,12 +112,12 @@ async function run() {
 
   let currentCarId = getRandomCarId();
 
-  setInterval(async () => {
+  while (true) {
     try {
       const useSameId = Math.random() > 0.5;
 
       if (!useSameId) {
-        currentCarId = getRandomCarId(); // INSERT
+        currentCarId = getRandomCarId(); // new car (INSERT possible)
       }
 
       const data = {
@@ -115,18 +133,15 @@ async function run() {
         }
       };
 
-      console.log(
-        useSameId
-          ? `♻️ UPDATE → carId: ${currentCarId}`
-          : `🆕 INSERT → carId: ${currentCarId}`
-      );
-
       await upsertCarData(data);
 
     } catch (err) {
-      console.error('❌ Interval Error:', err.message);
+      console.error('❌ Loop Error:', err.message);
     }
-  }, 5000); // ✅ 5 seconds
+
+    // wait interval
+    await new Promise(res => setTimeout(res, INTERVAL_MS));
+  }
 }
 
 // ✅ Start App
