@@ -80,11 +80,32 @@ async function upsertCarData(data) {
 
     const row = result.recordset[0];
 
-    if (row.action === 'INSERT') {
-      console.log(` INSERT → car_id: ${row.car_id}`);
-    } else {
-      console.log(` UPDATE → car_id: ${row.car_id}`);
-    }
+    const time = new Date().toISOString();
+if (row.action === 'INSERT') {
+  console.log('\n================ INSERT OPERATION ================');
+  console.log(`Timestamp     : ${time}`);
+  console.log(`Operation     : NEW RECORD CREATED`);
+  console.log(`Car ID        : ${row.car_id}`);
+  console.log(`Car Name      : ${row.car_name}`);
+  console.log(`Speed         : ${row.speed}`);
+  console.log(`Fuel Level    : ${row.fuel_level}`);
+  console.log(`Engine Temp   : ${row.engine_temp}`);
+  console.log(`Latitude      : ${row.latitude}`);
+  console.log(`Longitude     : ${row.longitude}`);
+  console.log('=================================================\n');
+} else {
+  console.log('\n================ UPDATE OPERATION ================');
+  console.log(`Timestamp     : ${time}`);
+  console.log(`Operation     : EXISTING RECORD MODIFIED`);
+  console.log(`Car ID        : ${row.car_id}`);
+  console.log(`Car Name      : ${row.car_name}`);
+  console.log(`Speed         : ${row.speed}`);
+  console.log(`Fuel Level    : ${row.fuel_level}`);
+  console.log(`Engine Temp   : ${row.engine_temp}`);
+  console.log(`Latitude      : ${row.latitude}`);
+  console.log(`Longitude     : ${row.longitude}`);
+  console.log('=================================================\n');
+}
 
   } catch (err) {
     console.error('❌ UPSERT Error:', err.message);
