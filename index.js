@@ -27,7 +27,26 @@ async function initDB() {
   }
 }
 
-// ✅ UPSERT Function 
+// ✅ Store carId → carName mapping
+const carMap = new Map();
+
+// ✅ Generate Random Car Number
+function generateCarNumber() {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  const state = 'KA';
+  const rto = Math.floor(10 + Math.random() * 90);
+
+  const series =
+    letters[Math.floor(Math.random() * 26)] +
+    letters[Math.floor(Math.random() * 26)];
+
+  const number = Math.floor(1000 + Math.random() * 9000);
+
+  return `${state}${rto}${series}${number}`;
+}
+
+// ✅ UPSERT Function
 async function upsertCarData(data) {
   try {
     const query = `
@@ -81,31 +100,23 @@ async function upsertCarData(data) {
     const row = result.recordset[0];
 
     const time = new Date().toISOString();
-if (row.action === 'INSERT') {
-  console.log('\n================ INSERT OPERATION ================');
-  console.log(`Timestamp     : ${time}`);
-  console.log(`Operation     : NEW RECORD CREATED`);
-  console.log(`Car ID        : ${row.car_id}`);
-  console.log(`Car Name      : ${row.car_name}`);
-  console.log(`Speed         : ${row.speed}`);
-  console.log(`Fuel Level    : ${row.fuel_level}`);
-  console.log(`Engine Temp   : ${row.engine_temp}`);
-  console.log(`Latitude      : ${row.latitude}`);
-  console.log(`Longitude     : ${row.longitude}`);
-  console.log('=================================================\n');
-} else {
-  console.log('\n================ UPDATE OPERATION ================');
-  console.log(`Timestamp     : ${time}`);
-  console.log(`Operation     : EXISTING RECORD MODIFIED`);
-  console.log(`Car ID        : ${row.car_id}`);
-  console.log(`Car Name      : ${row.car_name}`);
-  console.log(`Speed         : ${row.speed}`);
-  console.log(`Fuel Level    : ${row.fuel_level}`);
-  console.log(`Engine Temp   : ${row.engine_temp}`);
-  console.log(`Latitude      : ${row.latitude}`);
-  console.log(`Longitude     : ${row.longitude}`);
-  console.log('=================================================\n');
-}
+    if (row.action === 'INSERT') {
+      console.log('\n================ INSERT OPERATION ================');
+      console.log(`Timestamp     : ${time}`);
+      console.log(`Operation     : NEW RECORD CREATED`);
+    } else {
+      console.log('\n================ UPDATE OPERATION ================');
+      console.log(`Timestamp     : ${time}`);
+      console.log(`Operation     : EXISTING RECORD MODIFIED`);
+    }
+    console.log(`Car ID        : ${row.car_id}`);
+    console.log(`Car Name      : ${row.car_name}`);
+    console.log(`Speed         : ${row.speed}`);
+    console.log(`Fuel Level    : ${row.fuel_level}`);
+    console.log(`Engine Temp   : ${row.engine_temp}`);
+    console.log(`Latitude      : ${row.latitude}`);
+    console.log(`Longitude     : ${row.longitude}`);
+    console.log('=================================================\n');
 
   } catch (err) {
     console.error('❌ UPSERT Error:', err.message);
@@ -138,12 +149,19 @@ async function run() {
       const useSameId = Math.random() > 0.5;
 
       if (!useSameId) {
-        currentCarId = getRandomCarId(); // new car (INSERT possible)
+        currentCarId = getRandomCarId();
       }
+
+      // ✅ Maintain mapping (IMPORTANT 🔥)
+      if (!carMap.has(currentCarId)) {
+        carMap.set(currentCarId, generateCarNumber());
+      }
+
+      const carName = carMap.get(currentCarId);
 
       const data = {
         carId: currentCarId,
-        carName: "KA07JB007",
+        carName: carName, 
         speed: Math.random() * 100,
         fuelLevel: Math.floor(Math.random() * 100),
         headlight: Math.random() > 0.5,
