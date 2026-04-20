@@ -47,7 +47,10 @@ async function upsertCarData(data) {
         @headlight AS headlight,
         @engine_temp AS engine_temp,
         @latitude AS latitude,
-        @longitude AS longitude
+        @longitude AS longitude,
+        @battery_level AS battery_level,
+        @engine AS engine,
+        @air_pressure AS air_pressure
       ) AS source
       ON target.car_id = source.car_id
 
@@ -59,16 +62,21 @@ async function upsertCarData(data) {
           headlight = source.headlight,
           engine_temp = source.engine_temp,
           latitude = source.latitude,
-          longitude = source.longitude
+          longitude = source.longitude,
+          battery_level = source.battery_level,
+          engine = source.engine,
+          air_pressure = source.air_pressure
 
       WHEN NOT MATCHED THEN
         INSERT (
           car_id, car_name, speed, fuel_level,
-          headlight, engine_temp, latitude, longitude, created_at
+          headlight, engine_temp, latitude, longitude,
+          battery_level, engine, air_pressure, created_at
         )
         VALUES (
           source.car_id, source.car_name, source.speed, source.fuel_level,
-          source.headlight, source.engine_temp, source.latitude, source.longitude, GETDATE()
+          source.headlight, source.engine_temp, source.latitude, source.longitude,
+          source.battery_level, source.engine, source.air_pressure, GETDATE()
         )
 
       OUTPUT $action AS action, INSERTED.*;
@@ -83,11 +91,18 @@ async function upsertCarData(data) {
       .input('engine_temp', sql.Float, data.engineTemp)
       .input('latitude', sql.Float, data.location?.latitude ?? null)
       .input('longitude', sql.Float, data.location?.longitude ?? null)
+
+      // ✅ NEW FIELDS
+      .input('battery_level', sql.Int, data.batteryLevel)
+      .input('engine', sql.Bit, data.engine ? 1 : 0)
+      .input('air_pressure', sql.Int, data.airPressure)
+
       .query(query);
 
     const row = result.recordset[0];
     const time = new Date().toISOString();
 
+    // ================= LOGGING =================
     if (row.action === 'INSERT') {
       console.log('\n================ INSERT OPERATION ================');
       console.log(`Timestamp     : ${time}`);
@@ -105,6 +120,9 @@ async function upsertCarData(data) {
     console.log(`Engine Temp   : ${row.engine_temp}`);
     console.log(`Latitude      : ${row.latitude}`);
     console.log(`Longitude     : ${row.longitude}`);
+    console.log(`Battery Level : ${row.battery_level}`);
+    console.log(`Engine        : ${row.engine}`);
+    console.log(`Air Pressure  : ${row.air_pressure}`);
     console.log('=================================================\n');
 
   } catch (err) {
@@ -112,7 +130,7 @@ async function upsertCarData(data) {
   }
 }
 
-// ✅ ENV CONFIG
+// ================= ENV CONFIG =================
 const CAR_ID_MIN = parseInt(process.env.CAR_ID_MIN, 10) || 1;
 const CAR_ID_MAX = parseInt(process.env.CAR_ID_MAX, 10) || 15;
 const INTERVAL_MS = parseInt(process.env.INTERVAL_MS, 10) || 5000;
@@ -122,12 +140,12 @@ if (CAR_ID_MIN > CAR_ID_MAX) {
   throw new Error('CAR_ID_MIN cannot be greater than CAR_ID_MAX');
 }
 
-// ✅ Random carId
+// ================= RANDOM CAR ID =================
 function getRandomCarId() {
   return Math.floor(Math.random() * (CAR_ID_MAX - CAR_ID_MIN + 1)) + CAR_ID_MIN;
 }
 
-// ✅ Main Logic
+// ================= MAIN LOOP =================
 async function run() {
   await initDB();
 
@@ -141,7 +159,6 @@ async function run() {
         currentCarId = getRandomCarId();
       }
 
-      // ✅ FIXED: carName derived from carId only
       const carName = generateCarNumber(currentCarId);
 
       const data = {
@@ -154,7 +171,12 @@ async function run() {
         location: {
           latitude: 60 + Math.random() * 10,
           longitude: 80 + Math.random() * 10
-        }
+        },
+
+        // ✅ NEW FIELDS
+        batteryLevel: Math.floor(Math.random() * 100),
+        engine: Math.random() > 0.5,
+        airPressure: Math.floor(Math.random() * 100)
       };
 
       await upsertCarData(data);
@@ -163,15 +185,14 @@ async function run() {
       console.error('❌ Loop Error:', err.message);
     }
 
-    // wait interval
     await new Promise(res => setTimeout(res, INTERVAL_MS));
   }
 }
 
-// ✅ Start App
+// ================= START APP =================
 run();
 
-// ✅ Graceful Shutdown
+// ================= GRACEFUL SHUTDOWN =================
 process.on('SIGINT', async () => {
   console.log('🔻 Shutting down...');
   await sql.close();
