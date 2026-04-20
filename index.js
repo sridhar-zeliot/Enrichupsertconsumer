@@ -27,23 +27,11 @@ async function initDB() {
   }
 }
 
-// ✅ Store carId → carName mapping
-const carMap = new Map();
-
-// ✅ Generate Random Car Number
-function generateCarNumber() {
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-
-  const state = 'KA';
-  const rto = Math.floor(10 + Math.random() * 90);
-
-  const series =
-    letters[Math.floor(Math.random() * 26)] +
-    letters[Math.floor(Math.random() * 26)];
-
-  const number = Math.floor(1000 + Math.random() * 9000);
-
-  return `${state}${rto}${series}${number}`;
+// ✅ FIXED: carNumber from carId (same always)
+function generateCarNumber(carId) {
+  const prefix = 'KA07JB';
+  const suffix = String(carId).padStart(3, '0');
+  return `${prefix}${suffix}`;
 }
 
 // ✅ UPSERT Function
@@ -98,8 +86,8 @@ async function upsertCarData(data) {
       .query(query);
 
     const row = result.recordset[0];
-
     const time = new Date().toISOString();
+
     if (row.action === 'INSERT') {
       console.log('\n================ INSERT OPERATION ================');
       console.log(`Timestamp     : ${time}`);
@@ -109,6 +97,7 @@ async function upsertCarData(data) {
       console.log(`Timestamp     : ${time}`);
       console.log(`Operation     : EXISTING RECORD MODIFIED`);
     }
+
     console.log(`Car ID        : ${row.car_id}`);
     console.log(`Car Name      : ${row.car_name}`);
     console.log(`Speed         : ${row.speed}`);
@@ -152,16 +141,12 @@ async function run() {
         currentCarId = getRandomCarId();
       }
 
-      // ✅ Maintain mapping (IMPORTANT 🔥)
-      if (!carMap.has(currentCarId)) {
-        carMap.set(currentCarId, generateCarNumber());
-      }
-
-      const carName = carMap.get(currentCarId);
+      // ✅ FIXED: carName derived from carId only
+      const carName = generateCarNumber(currentCarId);
 
       const data = {
         carId: currentCarId,
-        carName: carName, 
+        carName: carName,
         speed: Math.random() * 100,
         fuelLevel: Math.floor(Math.random() * 100),
         headlight: Math.random() > 0.5,
